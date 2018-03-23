@@ -1,5 +1,6 @@
 package io.embs;
 
+import brave.Span;
 import brave.Tracer;
 import brave.Tracing;
 
@@ -12,7 +13,7 @@ import zipkin2.reporter.okhttp3.OkHttpSender;
  */
 public class App 
 {
-    public static void main( String[] args )
+    public static void main( String[] args ) throws Exception
     {
         OkHttpSender sender;
         AsyncReporter spanReporter;
@@ -33,8 +34,24 @@ public class App
         // Tracing exposes objects you might need, most importantly the tracer
         tracer = tracing.tracer();
 
-        tracer.nextSpan().name("encode").start().finish();
-        
+        Span twoPhase = tracer.newTrace().name("twoPhase").start();
+        try {
+            Span prepare = tracer.newChild(twoPhase.context()).name("prepare").start();
+            try {
+                System.out.print("prepare");
+            } finally {
+                prepare.finish();
+            }
+            Thread.sleep(1);
+            Span commit = tracer.newChild(twoPhase.context()).name("commit").start();
+            try {
+                System.out.print("commit");
+            } finally {
+                commit.finish();
+            }
+        } finally {
+            twoPhase.finish();
+        }
 
         // Failing to close resources can result in dropped spans! When tracing is no
         // longer needed, close the components you made in reverse order. This might be
